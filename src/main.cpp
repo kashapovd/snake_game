@@ -1,22 +1,19 @@
 #include <avr/pgmspace.h>
-#include <math.h>
 #include <Adafruit_GFX.h>
 #include <ST7558.h>
 #include <Wire.h>
 #include <SPI.h>
 #include <logo.h>
 
-// set pin
+// set pins
 #define RST_PIN A3
 #define STICK_X A2
 #define STICK_Y A1
 #define SW A0
 
-// lcd parameters
+// gamefield
 #define width 96
 #define height 65
-
-// game field
 #define field_x 95
 #define field_y 56
 #define a 3
@@ -26,26 +23,30 @@ void draw_options();
 void draw_gameover_menu();
 void draw_game();
 void default_set();
-bool menu_switcher(bool);
+int8_t menu_switcher (int8_t, int8_t);
+void on_click();
 void get_dir();
 void logic();
 
-
-int sn_x, sn_y, food_x, food_y, n_eat = 0; 
-int score = 0;
-bool game_over = false;
+int8_t sn_x, sn_y, food_x, food_y, n_eat; 
+int8_t score;
+bool game_over;
+bool options_state = false;
 bool menu_state = true;
-bool restart = true;
-bool start = true;
-bool options = false;
-int tailX[60];
-int tailY[60];
+bool borders = false;
+int8_t main_menu_item = 1;
+int8_t gameover_menu_item = 1;
+int8_t option_menu_item = 1;
+
+int8_t tailX[60];
+int8_t tailY[60];
 enum Direction { STAY, LEFT, RIGHT, UP, DOWN };
 Direction dir;
 ST7558 lcd = ST7558(RST_PIN);
-byte contrast;
+int8_t contrast;
 
 void setup() {
+
   Serial.begin(9600);
   
   // rand init
@@ -63,18 +64,23 @@ void setup() {
   // game init
   default_set();
   menu_state = true;
+
 }
 
+// main loop
 void loop() {
 
-  if (menu_state) {
+  if (menu_state) 
     draw_menu();
-  }
+  else if (options_state)
+    draw_options();
   else {
+
     if (!game_over)
       draw_game();
     else
       draw_gameover_menu();
+
   }
   
   lcd.display();
@@ -88,12 +94,14 @@ void default_set() {
   score = 0;
   // start point for snake
   sn_x = 46;
-  sn_y = 37;
+  sn_y = 34;
   // start point for food
   food_x = random(0, 30) * 3 + 1;
   food_y = random(3, 17) * 3 + 1;
   n_eat = 0;
   dir = STAY;
+  main_menu_item = 1;
+  gameover_menu_item = 1;
 
 }
 
@@ -101,7 +109,7 @@ void draw_menu() {
 
   dir = STAY;
 
-  lcd.drawBitmap( (width/2) - (logo_w/2), 3, logo_snake, logo_w, logo_h, BLACK );
+  lcd.drawBitmap( random(14, 16), random(2, 4), logo_snake, snake_logo_w, snake_logo_h, BLACK );
   lcd.drawRoundRect( (width/2) - 16, 35, 33, 11, 2, BLACK );
   lcd.setCursor( (width/2) - 14, 37 );
   lcd.print("start");
@@ -109,52 +117,102 @@ void draw_menu() {
   lcd.setCursor( (width/2) - 20, 51 );
   lcd.print("options");
 
-  start = menu_switcher(start);
-  if (start)
+  int8_t n_items = 2;
+  main_menu_item = menu_switcher(main_menu_item, n_items);
+  if (main_menu_item == 1)
     lcd.drawRoundRect( (width/2) - 17, 34, 35, 13, 2, BLACK );
-  else
+  else if (main_menu_item == 2)
     lcd.drawRoundRect( (width/2) - 23, 48, 47, 14, 2, BLACK );
   
   if (!digitalRead(SW)) {
-    if (start) {
+
+    on_click();
+    if (main_menu_item == 1) {
+
       menu_state = false;
       default_set();
+
     }
     else {
-      draw_options();
+
+      menu_state = false;
+      options_state = true;
+      option_menu_item = 1;
+
     }
+
   }
+
 }
 
 void draw_options() {
-  options = true;
-  while (options) {
 
-    lcd.setCursor(0,0);
-    lcd.print("Set contrast:");
+    lcd.setCursor(8, 0);
+    lcd.print("contrast:");
     lcd.print(contrast);
-    lcd.display();
-    lcd.clearDisplay();
+    lcd.setCursor(8, 8);
+    lcd.print("borders:");
+    if (borders)
+      lcd.print("true");
+    else 
+      lcd.print("false");
+    lcd.setCursor(8, 15);
+    lcd.print("exit");
     
-    get_dir();
-    switch (dir) {
-    case LEFT:
-      contrast += 5;
-      dir = STAY;
-      break;
-    case RIGHT:
-      contrast -= 5;
-      dir = STAY;
-    default:
-      break;
+    int n_items = 3;
+    option_menu_item = menu_switcher(option_menu_item, n_items);
+    
+    if (option_menu_item == 1) {
+
+      lcd.setCursor(0,0);
+      lcd.print('>');
+
+      get_dir();
+      switch (dir) {
+
+      case LEFT:
+        contrast += 5;
+        dir = STAY;
+        break;
+      case RIGHT:
+        contrast -= 5;
+        dir = STAY;
+      default:
+        break;
+
+      }
+
+      lcd.setContrast(contrast);
+
     }
-    
-    lcd.setContrast(contrast);
-    if (!digitalRead(SW) == true) {
-      options = false;
+    else if (option_menu_item == 2) {
+
+      lcd.setCursor(0, 8);
+      lcd.print('>');
+
+      if (!digitalRead(SW)) {
+
+        on_click();
+        borders = !borders;
+
+      }
+
+    }
+    else {
+
+      lcd.setCursor(0, 15);
+      lcd.print('>');
+
+      if (!digitalRead(SW)) {
+
+        on_click();
+        menu_state = true;
+        options_state = false;
+
+      }
+
     }
 
-  }
 }
 
 void draw_game() {
@@ -169,7 +227,7 @@ void draw_game() {
   lcd.drawRect( food_x, food_y, a, a, BLACK );
 
   // draw snake's tail 
-  for (int i = 0; i < n_eat; i++)
+  for (int8_t i = 0; i < n_eat; i++)
     lcd.drawRoundRect( tailX[i], tailY[i], a, a, 1, BLACK );
   
 }
@@ -178,7 +236,7 @@ void draw_gameover_menu () {
 
   dir = STAY;
 
-  lcd.drawBitmap( 0, 0, logo_gameOver, gameOver_w, gameOver_h, BLACK );
+  lcd.drawBitmap( 0, 0, logo_gameOver, gameover_logo_w, gameover_logo_h, BLACK );
   lcd.drawRoundRect( (width/2) - 22, 35, 45, 11, 2, BLACK );
   lcd.setCursor( (width/2) - 20, 37 );
   lcd.print("restart");
@@ -186,43 +244,61 @@ void draw_gameover_menu () {
   lcd.drawRoundRect( (width/2) - 13, 49, 27, 12, 2, BLACK );
   lcd.setCursor( (width/2) - 11, 51 );
   lcd.print("menu");
-    
-  restart = menu_switcher(restart);
-    
-  if (restart)
+
+  int8_t n_items = 2;
+  gameover_menu_item = menu_switcher(gameover_menu_item, n_items);
+  
+  if (gameover_menu_item == 1)
     lcd.drawRoundRect( (width/2) - 23, 34, 47, 13, 2, BLACK );
-  else
+  else if (gameover_menu_item == 2)
     lcd.drawRoundRect( (width/2) - 14, 48, 29, 14, 2, BLACK );
 
   if (!digitalRead(SW)) {
-    if (restart)
+
+    on_click();
+    if (gameover_menu_item == 1)
       default_set();
     else {
       menu_state = true;
-    } 
+    }
+
   }
 
 }
 
-bool menu_switcher (bool var_sw) {
+int8_t menu_switcher (int8_t menu_item, int8_t n_items) {
+
   get_dir();
   switch (dir) {
+
   case DOWN:
-    if (var_sw)
-      var_sw = !var_sw;
-    else
-      var_sw = true;
+    menu_item--;
+    if (menu_item <= 0)
+      menu_item = n_items;
     break;
   case UP:
-    if (!var_sw)
-      var_sw = !var_sw;
-    else 
-      var_sw = false;
+    menu_item++;
+    if (menu_item > n_items)
+      menu_item = 1;
     break;
   default:
     break;
+
   }
-  return var_sw;
+  while (dir == UP || dir == DOWN) {
+    if (analogRead(STICK_Y) > 400 && analogRead(STICK_Y) < 600)
+      dir = STAY;
+  }
+  return menu_item;
+
+}
+
+void on_click() {
+
+  while (!digitalRead(SW)){
+      ;;
+  }
+  
 }
 
 void get_dir() {
@@ -230,16 +306,16 @@ void get_dir() {
   int stick_x = analogRead(A2);
   int stick_y = analogRead(A1);
   
-  if (stick_x > 1020) {
+  if (stick_x > 700) {
     dir = RIGHT;
   } 
-  else if (stick_x < 10) {
+  else if (stick_x < 100) {
     dir = LEFT;
   }
-  if (stick_y > 1020) {
+  if (stick_y > 700) {
     dir = UP;
   }
-  else if (stick_y < 10) {
+  else if (stick_y < 100) {
     dir = DOWN;
   }
     
@@ -265,46 +341,59 @@ void logic() {
   }
 
   get_dir();
+  
   switch (dir) {
 
     case UP:
-      sn_y += a;
+      if (!(sn_x == 94 || sn_x == -2))
+        sn_y += a;
       break;
     case DOWN:
-      sn_y -= a;
+      if (!(sn_x == 94 || sn_x == -2))
+        sn_y -= a;
       break;
     case LEFT:
-      sn_x -= a;
+      if (!(sn_y == 64 || sn_y == 7))
+        sn_x -= a;
       break;
     case RIGHT:
-      sn_x += a;
+      if (!(sn_y == 64 || sn_y == 7))
+        sn_x += a;
       break;
     case STAY:
       break;
 
   } 
 
-  // check borders
-  switch (sn_y) {
+  if (!borders) {
+    // check borders
+    switch (sn_y) {
 
-  case 64:
-    sn_y = 10;
-    break;
-  case 7: 
-    sn_y = 64;
-    break;
+    case 64:
+      sn_y = 10;
+      break;
+    case 7: 
+      sn_y = 64;
+      break;
 
+    }
+    switch (sn_x) {
+
+    case -2:
+      sn_x = 91;
+      break;
+    case 94:
+      sn_x = 1;
+      break;
+
+    }
   }
-  switch (sn_x) {
-
-  case -2:
-    sn_x = 91;
-    break;
-  case 94:
-    sn_x = 1;
-    break;
-
+  else {
+    if ( sn_y+a == 10 || sn_y-a == 61 || sn_x+a == 1 || sn_x-a == 91 ) {
+      game_over = true;
+    }
   }
+  
 
   // renew food position
   if (sn_x == food_x && sn_y == food_y) {
@@ -316,9 +405,8 @@ void logic() {
 
   }
 
-  for (int k = 0; k < n_eat; k++) {
+  for (int k = 0; k < n_eat; k++)
     if (tailX[k] == sn_x && tailY[k] == sn_y)
       game_over = true;
-  }
 
 }

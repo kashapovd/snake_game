@@ -1,8 +1,8 @@
 #include <avr/pgmspace.h>
 
 // logo parameters
-#define logo_h 27
-#define logo_w 71
+#define snake_logo_h 27
+#define snake_logo_w 71
 
 const unsigned char PROGMEM logo_snake[] = {
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
@@ -36,8 +36,8 @@ const unsigned char PROGMEM logo_snake[] = {
 };
 
 // logo parameters
-#define gameOver_h 30
-#define gameOver_w 96
+#define gameover_logo_h 30
+#define gameover_logo_w 96
 
 const unsigned char PROGMEM logo_gameOver[] = {
   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
