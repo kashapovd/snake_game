@@ -86,6 +86,7 @@ void loop() {
   
   lcd.display();
   lcd.clearDisplay();
+  
 }
 
 // set default game options
@@ -444,8 +445,8 @@ void logic() {
       break;
 
   } 
-  last_dir = dir;
 
+  last_dir = dir;
 
   if (!borders) {
     // check borders
