@@ -28,17 +28,16 @@ void on_click();
 void get_dir();
 void logic();
 
-int8_t sn_x, sn_y, food_x, food_y, n_eat; 
-int8_t score;
-int8_t last_dir;
+int8_t sn_x, sn_y, food_x, food_y, n_eat, last_dir;
+int8_t main_menu_item = 1;
+int8_t gameover_menu_item = 1;
+int8_t options_menu_item = 1;
 bool game_over;
 bool options_state = false;
 bool menu_state = true;
 bool borders = false;
 bool flicker = true;
-int8_t main_menu_item = 1;
-int8_t gameover_menu_item = 1;
-int8_t option_menu_item = 1;
+
 
 int8_t tailX[60];
 int8_t tailY[60];
@@ -93,7 +92,6 @@ void loop() {
 void default_set() {
 
   game_over = false;
-  score = 0;
   // start point for snake
   sn_x = 46;
   sn_y = 34;
@@ -167,7 +165,7 @@ void draw_menu() {
 
       menu_state = false;
       options_state = true;
-      option_menu_item = 1;
+      options_menu_item = 1;
 
     }
 
@@ -190,9 +188,9 @@ void draw_options() {
     lcd.print("exit");
     
     int n_items = 3;
-    option_menu_item = menu_switcher(option_menu_item, n_items);
+    options_menu_item = menu_switcher(options_menu_item, n_items);
     
-    if (option_menu_item == 1) {
+    if (options_menu_item == 1) {
 
       lcd.setCursor(0,0);
       lcd.print('>');
@@ -215,7 +213,7 @@ void draw_options() {
       lcd.setContrast(contrast);
 
     }
-    else if (option_menu_item == 2) {
+    else if (options_menu_item == 2) {
 
       lcd.setCursor(0, 8);
       lcd.print('>');
@@ -250,7 +248,7 @@ void draw_game() {
   lcd.drawRect( 0, 9, field_x, field_y, BLACK );
   lcd.setCursor( 1, 1 );
   lcd.print("Score:");
-  lcd.print(score);
+  lcd.print(n_eat);
 
   logic();
   lcd.fillRect( sn_x, sn_y, a, a, BLACK );
@@ -485,7 +483,6 @@ void logic() {
     food_x = random(0, 30) * 3 + 1;
     food_y = random(3, 17) * 3 + 1;
     n_eat++;
-    score++;
 
   }
 
