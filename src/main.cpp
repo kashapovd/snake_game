@@ -30,10 +30,12 @@ void logic();
 
 int8_t sn_x, sn_y, food_x, food_y, n_eat; 
 int8_t score;
+int8_t last_dir;
 bool game_over;
 bool options_state = false;
 bool menu_state = true;
 bool borders = false;
+bool flicker = true;
 int8_t main_menu_item = 1;
 int8_t gameover_menu_item = 1;
 int8_t option_menu_item = 1;
@@ -109,7 +111,7 @@ void draw_menu() {
 
   dir = STAY;
 
-  lcd.drawBitmap( random(14, 16), random(2, 4), logo_snake, snake_logo_w, snake_logo_h, BLACK );
+  lcd.drawBitmap( random( 14, 16 ), random( 2, 4 ), logo_snake, snake_logo_w, snake_logo_h, BLACK );
   lcd.drawRoundRect( (width/2) - 16, 35, 33, 11, 2, BLACK );
   lcd.setCursor( (width/2) - 14, 37 );
   lcd.print("start");
@@ -118,15 +120,43 @@ void draw_menu() {
   lcd.print("options");
 
   int8_t n_items = 2;
-  main_menu_item = menu_switcher(main_menu_item, n_items);
-  if (main_menu_item == 1)
-    lcd.drawRoundRect( (width/2) - 17, 34, 35, 13, 2, BLACK );
-  else if (main_menu_item == 2)
-    lcd.drawRoundRect( (width/2) - 23, 48, 47, 14, 2, BLACK );
+  main_menu_item = menu_switcher( main_menu_item, n_items );
+  if (main_menu_item == 1) {
+
+    if (flicker) {
+
+      lcd.drawRoundRect( (width/2) - 17, 34, 35, 13, 2, BLACK );
+      flicker = !flicker;
+
+    }
+    else {
+
+      lcd.drawRoundRect( (width/2) - 17, 34, 35, 13, 2, WHITE );
+      flicker = !flicker;
+
+    }
+
+  }
+    
+  else if (main_menu_item == 2) {
+
+    if (flicker) {
+
+      lcd.drawRoundRect( (width/2) - 23, 48, 47, 14, 2, BLACK );
+      flicker = !flicker;
+
+    }
+    else {
+
+      lcd.drawRoundRect( (width/2) - 23, 48, 47, 14, 2, WHITE );
+      flicker = !flicker;
+      
+    }
+    
+  }
+    
   
   if (!digitalRead(SW)) {
-
-    on_click();
     if (main_menu_item == 1) {
 
       menu_state = false;
@@ -236,7 +266,7 @@ void draw_gameover_menu () {
 
   dir = STAY;
 
-  lcd.drawBitmap( 0, 0, logo_gameOver, gameover_logo_w, gameover_logo_h, BLACK );
+  lcd.drawBitmap( random(-1, 1), random(-1,1), logo_gameOver, gameover_logo_w, gameover_logo_h, BLACK );
   lcd.drawRoundRect( (width/2) - 22, 35, 45, 11, 2, BLACK );
   lcd.setCursor( (width/2) - 20, 37 );
   lcd.print("restart");
@@ -248,10 +278,39 @@ void draw_gameover_menu () {
   int8_t n_items = 2;
   gameover_menu_item = menu_switcher(gameover_menu_item, n_items);
   
-  if (gameover_menu_item == 1)
-    lcd.drawRoundRect( (width/2) - 23, 34, 47, 13, 2, BLACK );
-  else if (gameover_menu_item == 2)
-    lcd.drawRoundRect( (width/2) - 14, 48, 29, 14, 2, BLACK );
+  if (gameover_menu_item == 1) {
+
+    if (flicker) {
+
+      lcd.drawRoundRect( (width/2) - 23, 34, 47, 13, 2, BLACK );
+      flicker = !flicker;
+
+    }
+    else {
+
+      lcd.drawRoundRect( (width/2) - 23, 34, 47, 13, 2, WHITE );
+      flicker = !flicker;
+
+    }
+    
+  }
+  else if (gameover_menu_item == 2) {
+    
+    if (flicker) {
+
+      lcd.drawRoundRect( (width/2) - 14, 48, 29, 14, 2, BLACK );
+      flicker = !flicker;
+
+    }
+    else {
+
+      lcd.drawRoundRect( (width/2) - 14, 48, 29, 14, 2, WHITE );
+      flicker = !flicker;
+
+    }
+    
+  }
+    
 
   if (!digitalRead(SW)) {
 
@@ -341,29 +400,54 @@ void logic() {
   }
 
   get_dir();
-  
+
+  switch (last_dir) {
+
+    case UP:
+      if (dir == DOWN)
+        dir = UP;
+      break;
+    case DOWN:
+      if (dir == UP)
+        dir = DOWN;
+        break;
+    case LEFT:
+      if (dir == RIGHT)
+      dir = LEFT;
+      break;
+    case RIGHT:
+      if (dir == LEFT)
+      dir = RIGHT;
+      break;
+    default:
+      break;
+
+  }
+
   switch (dir) {
 
     case UP:
-      if (!(sn_x == 94 || sn_x == -2))
+      if (sn_x != -2) 
         sn_y += a;
       break;
     case DOWN:
-      if (!(sn_x == 94 || sn_x == -2))
+      if (sn_x != 94)
         sn_y -= a;
       break;
     case LEFT:
-      if (!(sn_y == 64 || sn_y == 7))
+      if (sn_y != 7)
         sn_x -= a;
       break;
     case RIGHT:
-      if (!(sn_y == 64 || sn_y == 7))
+      if (sn_y != 64)
         sn_x += a;
       break;
     case STAY:
       break;
 
   } 
+  last_dir = dir;
+
 
   if (!borders) {
     // check borders
@@ -406,7 +490,8 @@ void logic() {
   }
 
   for (int k = 0; k < n_eat; k++)
-    if (tailX[k] == sn_x && tailY[k] == sn_y)
+    if (tailX[k] == sn_x && tailY[k] == sn_y) {
       game_over = true;
-
+    }
+      
 }
