@@ -1,12 +1,29 @@
 #include <avr/pgmspace.h>
+#include <avr/eeprom.h>
 #include <Adafruit_GFX.h>
 #include <ST7558.h>
 #include <Wire.h>
 #include <SPI.h>
 #include <logo.h>
 
-// set pins
-#define RST_PIN A3
+/* set pins
+
+  Display connections:
+    VCC -> +5v arduino pin
+    GND -> +0v arduino pin 
+    SCL -> A5 arduino pin
+    SDA -> A4 arduino pin
+    RST -> A3 arduino pin
+
+  Joystick connections:
+    VCC -> +5v arduino pin
+    GND -> +0v arduino pin
+    URX -> A2 arduino pin
+    URY -> A1 arduino pin
+    SW -> A0(digital mode) arduino pin via 10k pullup resistor
+
+*/
+#define RST_PIN A3 
 #define STICK_X A2
 #define STICK_Y A1
 #define SW A0
@@ -18,38 +35,53 @@
 #define field_y 56
 #define a 3
 
-void draw_menu();
-void draw_options();
-void draw_gameover_menu();
-void draw_game();
-void default_set();
-int8_t menu_switcher (int8_t, int8_t);
-void on_click();
-void get_dir();
-void logic();
+// functions
+void 
+  draw_menu(),
+  draw_options(),
+  draw_gameover_menu(),
+  draw_game(),
+  default_set(),
+  on_click(),
+  get_dir(),
+  logic();
+int8_t 
+  menu_switcher (int8_t, int8_t);
 
-int8_t sn_x, sn_y, food_x, food_y, n_eat, last_dir;
-int8_t main_menu_item = 1;
-int8_t gameover_menu_item = 1;
-int8_t options_menu_item = 1;
-bool game_over;
-bool options_state = false;
-bool menu_state = true;
-bool borders = false;
-bool flicker = true;
+// vars
+int8_t  
+  sn_x,                     // snake horizontally position
+  sn_y,                     // snake vertical position
+  food_x,                   // food horizontally position
+  food_y,                   // food vertical position
+  n_eat,                    // the number of eaten food
+  prev_dir,                 // previos direction of snake. need for correct game's experience
+  main_menu_item = 1,       // default menu state
+  gameover_menu_item = 1, 
+  options_menu_item = 1, 
+  contrast;
+bool 
+  game_over,
+  options_state,
+  menu_state,
+  borders,
+  flicker = true;
 
+// arrays for snake's tail
+int8_t 
+  tailX[60],
+  tailY[60];
 
-int8_t tailX[60];
-int8_t tailY[60];
+uint8_t EEMEM contrast_addr;
+uint8_t EEMEM border_state_addr;
+
 enum Direction { STAY, LEFT, RIGHT, UP, DOWN };
 Direction dir;
 ST7558 lcd = ST7558(RST_PIN);
-int8_t contrast;
 
 void setup() {
-
-  Serial.begin(9600);
   
+  Serial.begin(9600); // debug
   // rand init
   randomSeed(analogRead(A7));
 
@@ -59,8 +91,7 @@ void setup() {
   Wire.begin();
   lcd.init();
   lcd.setRotation(0);
-  contrast = 65;
-  lcd.setContrast(contrast);
+  lcd.setContrast( eeprom_read_byte( &contrast_addr ) );
 
   // game init
   default_set();
@@ -110,7 +141,7 @@ void draw_menu() {
 
   dir = STAY;
 
-  lcd.drawBitmap( random( 14, 16 ), random( 2, 4 ), logo_snake, snake_logo_w, snake_logo_h, BLACK );
+  lcd.drawBitmap( random(14, 16), random(2, 4), logo_snake, snake_logo_w, snake_logo_h, BLACK );
   lcd.drawRoundRect( (width/2) - 16, 35, 33, 11, 2, BLACK );
   lcd.setCursor( (width/2) - 14, 37 );
   lcd.print("start");
@@ -158,15 +189,19 @@ void draw_menu() {
   if (!digitalRead(SW)) {
     if (main_menu_item == 1) {
 
+      on_click();
       menu_state = false;
       default_set();
 
     }
     else {
 
+      on_click();
       menu_state = false;
       options_state = true;
       options_menu_item = 1;
+      contrast = eeprom_read_byte( &contrast_addr );
+      borders = eeprom_read_byte( &border_state_addr );
 
     }
 
@@ -176,71 +211,74 @@ void draw_menu() {
 
 void draw_options() {
 
-    lcd.setCursor(8, 0);
-    lcd.print("contrast:");
-    lcd.print(contrast);
-    lcd.setCursor(8, 8);
-    lcd.print("borders:");
-    if (borders)
-      lcd.print("true");
-    else 
-      lcd.print("false");
-    lcd.setCursor(8, 15);
-    lcd.print("exit");
+  lcd.setCursor(8, 0);
+  lcd.print("contrast:");
+  lcd.print(contrast);
+  lcd.setCursor(8, 8);
+  lcd.print("borders:");
+  if (borders)
+    lcd.print("true");
+  else 
+    lcd.print("false");
+  lcd.setCursor(8, 15);
+  lcd.print("exit");
     
-    int n_items = 3;
-    options_menu_item = menu_switcher(options_menu_item, n_items);
+  int n_items = 3;
+  options_menu_item = menu_switcher(options_menu_item, n_items);
     
-    if (options_menu_item == 1) {
+  if (options_menu_item == 1) {
 
-      lcd.setCursor(0,0);
-      lcd.print('>');
+    lcd.setCursor(0,0);
+    lcd.print('>');
 
-      get_dir();
-      switch (dir) {
+    get_dir();
+    switch (dir) {
 
-      case LEFT:
-        contrast += 5;
-        dir = STAY;
-        break;
-      case RIGHT:
-        contrast -= 5;
-        dir = STAY;
-      default:
-        break;
-
-      }
-
-      lcd.setContrast(contrast);
+    case LEFT:
+      contrast += 5;
+      dir = STAY;
+      break;
+    case RIGHT:
+      contrast -= 5;
+      dir = STAY;
+    default:
+      break;
 
     }
-    else if (options_menu_item == 2) {
 
-      lcd.setCursor(0, 8);
-      lcd.print('>');
+    lcd.setContrast(contrast);
 
-      if (!digitalRead(SW)) {
+  }
+  else if (options_menu_item == 2) {
 
-        on_click();
-        borders = !borders;
+    lcd.setCursor(0, 8);
+    lcd.print('>');
 
-      }
+    if (!digitalRead(SW)) {
 
-    }
-    else {
-
-      lcd.setCursor(0, 15);
-      lcd.print('>');
-
-      if (!digitalRead(SW)) {
-
-        on_click();
-        menu_state = true;
-        options_state = false;
-
-      }
+      on_click();
+      borders = !borders;
 
     }
+
+  }
+  else {
+
+    lcd.setCursor(0, 15);
+    lcd.print('>');
+
+    if (!digitalRead(SW)) {
+
+      eeprom_update_byte(&contrast_addr, contrast);
+      eeprom_update_byte(&border_state_addr, borders);
+
+      on_click();
+      menu_state = true;
+      options_state = false;
+
+    }
+
+  }
 
 }
 
@@ -252,12 +290,14 @@ void draw_game() {
   lcd.print(n_eat);
 
   logic();
+  
+  // draw snake's head
   lcd.fillRect( sn_x, sn_y, a, a, BLACK );
-  lcd.drawRect( food_x, food_y, a, a, BLACK );
-
   // draw snake's tail 
   for (int8_t i = 0; i < n_eat; i++)
     lcd.drawRoundRect( tailX[i], tailY[i], a, a, 1, BLACK );
+  // draw food
+  lcd.drawRect( food_x, food_y, a, a, BLACK );
   
 }
 
@@ -399,8 +439,7 @@ void logic() {
   }
 
   get_dir();
-
-  switch (last_dir) {
+  switch (prev_dir) {
 
     case UP:
       if (dir == DOWN)
@@ -446,10 +485,10 @@ void logic() {
 
   } 
 
-  last_dir = dir;
+  prev_dir = dir;
 
   if (!borders) {
-    // check borders
+
     switch (sn_y) {
 
     case 64:
@@ -470,14 +509,13 @@ void logic() {
       break;
 
     }
+    
   }
-  else {
-    if ( sn_y+a == 10 || sn_y-a == 61 || sn_x+a == 1 || sn_x-a == 91 ) {
+  else
+    // if bump into borders
+    if ( sn_y+a == 10 || sn_y-a == 61 || sn_x+a == 1 || sn_x-a == 91 )
       game_over = true;
-    }
-  }
   
-
   // renew food position
   if (sn_x == food_x && sn_y == food_y) {
 
@@ -487,9 +525,9 @@ void logic() {
 
   }
 
+  // check self-eating
   for (int k = 0; k < n_eat; k++)
-    if (tailX[k] == sn_x && tailY[k] == sn_y) {
+    if (tailX[k] == sn_x && tailY[k] == sn_y)
       game_over = true;
-    }
       
 }
