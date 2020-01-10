@@ -245,7 +245,6 @@ void draw_options() {
       break;
 
     }
-
     lcd.setContrast(contrast);
 
   }
