@@ -9,7 +9,7 @@
 /* set pins
 
   Display connections:
-    VCC -> +5v arduino pin
+    VCC -> +3.3v arduino pin
     GND -> +0v arduino pin 
     SCL -> A5 arduino pin
     SDA -> A4 arduino pin
@@ -20,13 +20,16 @@
     GND -> +0v arduino pin
     URX -> A2 arduino pin
     URY -> A1 arduino pin
-    SW -> A0(digital mode) arduino pin via 10k pullup resistor
+    SW -> A0 arduino pin via 10k pullup resistor
+
+    speaker -> 3 arduino pin
 
 */
 #define RST_PIN A3 
 #define STICK_X A2
 #define STICK_Y A1
 #define SW A0
+#define SPK 3
 
 // gamefield
 #define width 96
@@ -44,48 +47,55 @@ void
   default_set(),
   on_click(),
   get_dir(),
-  logic();
-int8_t 
-  menu_switcher (int8_t, int8_t);
+  logic(),
+  no_tone(uint8_t);
+uint8_t 
+  menu_switcher (uint8_t, uint8_t);
 
 // vars
-int8_t  
+int8_t 
   sn_x,                     // snake horizontally position
   sn_y,                     // snake vertical position
   food_x,                   // food horizontally position
-  food_y,                   // food vertical position
+  food_y;                   // food vertical position           
+uint8_t
   n_eat,                    // the number of eaten food
-  prev_dir,                 // previos direction of snake. need for correct game's experience
-  main_menu_item = 1,       // default menu state
-  gameover_menu_item = 1, 
-  options_menu_item = 1, 
-  contrast;
-bool 
+  prev_dir,                 // previos direction of snake. need for correct game experience
+  main_menu_item,
+  gameover_menu_item,
+  options_menu_item,
+  contrast;                 // lcd contrast parameter
+uint32_t
+  prev_millis = 0;
+bool
   game_over,
   options_state,
   menu_state,
   borders,
-  flicker = true;
+  flicker,
+  spk_state;
 
 // arrays for snake's tail
 int8_t 
-  tailX[60],
-  tailY[60];
+  tailX[50],
+  tailY[50];
 
-uint8_t EEMEM contrast_addr;
-uint8_t EEMEM border_state_addr;
+// automatic eeprom address distributor
+uint8_t EEMEM 
+  contrast_addr,
+  border_state_addr;
 
-enum Direction { STAY, LEFT, RIGHT, UP, DOWN };
-Direction dir;
+enum direction { STAY, LEFT, RIGHT, UP, DOWN };
+direction dir;
 ST7558 lcd = ST7558(RST_PIN);
 
-void setup() {
+void setup() 
+{
+  Serial.begin(9600); // for debug
   
-  Serial.begin(9600); // debug
-  // rand init
-  randomSeed(analogRead(A7));
+  randomSeed(analogRead(A7)); // rand init
 
-  pinMode( SW, INPUT ); // for switch on stick
+  pinMode( SW, INPUT ); // for switch on a joystick
 
   // lcd init
   Wire.begin();
@@ -95,34 +105,35 @@ void setup() {
 
   // game init
   default_set();
+  borders = eeprom_read_byte( &border_state_addr );
   menu_state = true;
-
+  prev_millis = 0;
+  flicker = true,
+  spk_state = false;
 }
 
 // main loop
-void loop() {
-
+void loop() 
+{
   if (menu_state) 
     draw_menu();
   else if (options_state)
     draw_options();
-  else {
-
+  else 
+  {
     if (!game_over)
-      draw_game();
+      draw_game();   
     else
       draw_gameover_menu();
-
   }
   
   lcd.display();
   lcd.clearDisplay();
-  
 }
 
 // set default game options
-void default_set() {
-
+void default_set() 
+{
   game_over = false;
   // start point for snake
   sn_x = 46;
@@ -130,15 +141,15 @@ void default_set() {
   // start point for food
   food_x = random(0, 30) * 3 + 1;
   food_y = random(3, 17) * 3 + 1;
+
   n_eat = 0;
   dir = STAY;
   main_menu_item = 1;
   gameover_menu_item = 1;
-
 }
 
-void draw_menu() {
-
+void draw_menu() 
+{
   dir = STAY;
 
   lcd.drawBitmap( random(14, 16), random(2, 4), logo_snake, snake_logo_w, snake_logo_h, BLACK );
@@ -149,67 +160,60 @@ void draw_menu() {
   lcd.setCursor( (width/2) - 20, 51 );
   lcd.print("options");
 
-  int8_t n_items = 2;
+  uint8_t n_items = 2;
   main_menu_item = menu_switcher( main_menu_item, n_items );
-  if (main_menu_item == 1) {
 
-    if (flicker) {
-
+  if (main_menu_item == 1)
+  {
+    if (flicker)
+    {
       lcd.drawRoundRect( (width/2) - 17, 34, 35, 13, 2, BLACK );
       flicker = !flicker;
-
     }
-    else {
-
+    else 
+    {
       lcd.drawRoundRect( (width/2) - 17, 34, 35, 13, 2, WHITE );
       flicker = !flicker;
-
     }
-
   }
     
-  else if (main_menu_item == 2) {
-
-    if (flicker) {
-
+  else if (main_menu_item == 2) 
+  {
+    if (flicker) 
+    {
       lcd.drawRoundRect( (width/2) - 23, 48, 47, 14, 2, BLACK );
       flicker = !flicker;
-
     }
-    else {
-
+    else 
+    {
       lcd.drawRoundRect( (width/2) - 23, 48, 47, 14, 2, WHITE );
       flicker = !flicker;
-      
     }
-    
   }
-    
-  
-  if (!digitalRead(SW)) {
-    if (main_menu_item == 1) {
 
+  if (!digitalRead(SW)) 
+  {
+    if (main_menu_item == 1) 
+    {
       on_click();
       menu_state = false;
       default_set();
-
     }
-    else {
-
+    else 
+    {
       on_click();
       menu_state = false;
       options_state = true;
       options_menu_item = 1;
       contrast = eeprom_read_byte( &contrast_addr );
       borders = eeprom_read_byte( &border_state_addr );
-
     }
-
   }
-
 }
 
-void draw_options() {
+void draw_options() 
+{
+  dir = STAY;
 
   lcd.setCursor(8, 0);
   lcd.print("contrast:");
@@ -224,16 +228,16 @@ void draw_options() {
   lcd.print("exit");
     
   int n_items = 3;
-  options_menu_item = menu_switcher(options_menu_item, n_items);
-    
-  if (options_menu_item == 1) {
-
+    options_menu_item = menu_switcher(options_menu_item, n_items);
+  
+  if (options_menu_item == 1) 
+  {
     lcd.setCursor(0,0);
     lcd.print('>');
 
     get_dir();
-    switch (dir) {
-
+    switch (dir) 
+    {
     case LEFT:
       contrast += 5;
       dir = STAY;
@@ -243,65 +247,56 @@ void draw_options() {
       dir = STAY;
     default:
       break;
-
     }
     lcd.setContrast(contrast);
-
   }
-  else if (options_menu_item == 2) {
-
+  else if (options_menu_item == 2) 
+  {
     lcd.setCursor(0, 8);
     lcd.print('>');
 
-    if (!digitalRead(SW)) {
-
+    if (!digitalRead(SW)) 
+    {
       on_click();
       borders = !borders;
-
     }
-
   }
-  else {
-
+  else 
+  {
     lcd.setCursor(0, 15);
     lcd.print('>');
 
-    if (!digitalRead(SW)) {
-
-      eeprom_update_byte(&contrast_addr, contrast);
-      eeprom_update_byte(&border_state_addr, borders);
-
+    if (!digitalRead(SW)) 
+    {
+      eeprom_update_byte( &contrast_addr, contrast );
+      eeprom_update_byte( &border_state_addr, borders );
       on_click();
       menu_state = true;
       options_state = false;
-
     }
-
   }
-
 }
 
-void draw_game() {
-
+void draw_game() 
+{
   lcd.drawRect( 0, 9, field_x, field_y, BLACK );
   lcd.setCursor( 1, 1 );
   lcd.print("Score:");
   lcd.print(n_eat);
 
   logic();
-  
+
   // draw snake's head
   lcd.fillRect( sn_x, sn_y, a, a, BLACK );
   // draw snake's tail 
-  for (int8_t i = 0; i < n_eat; i++)
-    lcd.drawRoundRect( tailX[i], tailY[i], a, a, 1, BLACK );
+  for (uint8_t i = 0; i < n_eat; i++)
+    lcd.drawRoundRect( *(tailX + i), *(tailY + i), a, a, 1, BLACK );
   // draw food
   lcd.drawRect( food_x, food_y, a, a, BLACK );
-  
 }
 
-void draw_gameover_menu () {
-
+void draw_gameover_menu ()
+{
   dir = STAY;
 
   lcd.drawBitmap( random(-1, 1), random(-1,1), logo_gameOver, gameover_logo_w, gameover_logo_h, BLACK );
@@ -313,61 +308,55 @@ void draw_gameover_menu () {
   lcd.setCursor( (width/2) - 11, 51 );
   lcd.print("menu");
 
-  int8_t n_items = 2;
+  uint8_t n_items = 2;
   gameover_menu_item = menu_switcher(gameover_menu_item, n_items);
   
-  if (gameover_menu_item == 1) {
-
-    if (flicker) {
-
+  if (gameover_menu_item == 1) 
+  {
+    if (flicker) 
+    {
       lcd.drawRoundRect( (width/2) - 23, 34, 47, 13, 2, BLACK );
       flicker = !flicker;
-
     }
-    else {
-
+    else 
+    {
       lcd.drawRoundRect( (width/2) - 23, 34, 47, 13, 2, WHITE );
       flicker = !flicker;
-
     }
-    
   }
-  else if (gameover_menu_item == 2) {
-    
-    if (flicker) {
-
+  else if (gameover_menu_item == 2) 
+  {
+    if (flicker) 
+    {
       lcd.drawRoundRect( (width/2) - 14, 48, 29, 14, 2, BLACK );
       flicker = !flicker;
-
     }
-    else {
-
+    else 
+    {
       lcd.drawRoundRect( (width/2) - 14, 48, 29, 14, 2, WHITE );
       flicker = !flicker;
-
     }
-    
   }
-    
 
-  if (!digitalRead(SW)) {
-
+  if (!digitalRead(SW)) 
+  {
     on_click();
     if (gameover_menu_item == 1)
       default_set();
-    else {
+    else
       menu_state = true;
-    }
-
   }
-
 }
 
-int8_t menu_switcher (int8_t menu_item, int8_t n_items) {
-
-  get_dir();
-  switch (dir) {
-
+uint8_t menu_switcher (uint8_t menu_item, uint8_t n_items)
+{
+  if (millis() - prev_millis >= 150)
+  {
+    prev_millis = millis();
+    get_dir();
+  }
+  switch (dir) 
+  {
   case DOWN:
     menu_item--;
     if (menu_item <= 0)
@@ -380,66 +369,67 @@ int8_t menu_switcher (int8_t menu_item, int8_t n_items) {
     break;
   default:
     break;
-
   }
-  while (dir == UP || dir == DOWN) {
-    if (analogRead(STICK_Y) > 400 && analogRead(STICK_Y) < 600)
-      dir = STAY;
-  }
-  return menu_item;
 
-}
-
-void on_click() {
-
-  while (!digitalRead(SW)){
-      ;;
-  }
   
+  return menu_item;
 }
 
-void get_dir() {
+void on_click() 
+{
+  while (!digitalRead(SW))
+  {
+    ;;
+  }
+}
 
+void no_tone(uint8_t duration) 
+{
+  if (millis() - prev_millis >= duration && spk_state) 
+  {
+    prev_millis = 0;
+    noTone(SPK);
+    spk_state = false;
+  }
+}
+
+void get_dir() 
+{
   int stick_x = analogRead(A2);
   int stick_y = analogRead(A1);
-  
-  if (stick_x > 700) {
+
+  if (stick_x > 700)
     dir = RIGHT;
-  } 
-  else if (stick_x < 100) {
+  else if (stick_x < 100)
     dir = LEFT;
-  }
-  if (stick_y > 700) {
+  if (stick_y > 700)
     dir = UP;
-  }
-  else if (stick_y < 100) {
+  else if (stick_y < 100)
     dir = DOWN;
-  }
     
 }
   
-void logic() {
-
+void logic() 
+{
   int prevX = tailX[0];
   int prevY = tailY[0];
   int prev2X, prev2Y;
   tailX[0] = sn_x;
   tailY[0] = sn_y;
 
-  for (int i = 1; i <= n_eat; i++) {
-
+  for (int i = 1; i <= n_eat; i++)
+  {
     prev2X = tailX[i];
     prev2Y = tailY[i];
     tailX[i] = prevX;
     tailY[i] = prevY;
     prevX = prev2X;
     prevY = prev2Y;
-
   }
 
   get_dir();
-  switch (prev_dir) {
-
+  switch (prev_dir)
+  {
     case UP:
       if (dir == DOWN)
         dir = UP;
@@ -458,11 +448,10 @@ void logic() {
       break;
     default:
       break;
-
   }
 
-  switch (dir) {
-
+  switch (dir) 
+  {
     case UP:
       if (sn_x != -2) 
         sn_y += a;
@@ -481,52 +470,49 @@ void logic() {
       break;
     case STAY:
       break;
-
   } 
-
   prev_dir = dir;
 
   if (!borders) {
-
-    switch (sn_y) {
-
+    switch (sn_y) 
+    {
     case 64:
       sn_y = 10;
       break;
     case 7: 
       sn_y = 64;
       break;
-
     }
-    switch (sn_x) {
-
+    switch (sn_x) 
+    {
     case -2:
       sn_x = 91;
       break;
     case 94:
       sn_x = 1;
       break;
-
     }
-    
   }
   else
-    // if bump into borders
-    if ( sn_y+a == 10 || sn_y-a == 61 || sn_x+a == 1 || sn_x-a == 91 )
+    // if u bump into borders
+    if ( sn_y == 7 || sn_y == 64 || sn_x == -2 || sn_x == 94 )
       game_over = true;
-  
-  // renew food position
-  if (sn_x == food_x && sn_y == food_y) {
-
+      
+  if ( sn_x == food_x && sn_y == food_y ) 
+  {
+    // calculate food position 
     food_x = random(0, 30) * 3 + 1;
     food_y = random(3, 17) * 3 + 1;
-    n_eat++;
 
+    n_eat++; 
+    tone(SPK, 150);
+    spk_state = true;
+    prev_millis = millis();
   }
+  no_tone(100); // 100ms tone duration
 
   // check self-eating
   for (int k = 0; k < n_eat; k++)
-    if (tailX[k] == sn_x && tailY[k] == sn_y)
+    if ( tailX[k] == sn_x && tailY[k] == sn_y )
       game_over = true;
-      
 }
