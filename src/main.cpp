@@ -6,6 +6,8 @@
 #include <SPI.h>
 #include <logo.h>
 
+#define DEBUG 1
+
 /* set pins
 
   Display connections:
@@ -48,7 +50,7 @@ void
   on_click(),
   get_dir(),
   logic(),
-  no_tone(uint8_t);
+  no_tone(uint8_t duration);
 uint8_t 
   menu_switcher (uint8_t, uint8_t);
 
@@ -66,7 +68,7 @@ uint8_t
   options_menu_item,
   contrast;                 // lcd contrast parameter
 uint32_t
-  prev_millis = 0;
+  prev_millis;
 bool
   game_over,
   options_state,
@@ -85,14 +87,23 @@ uint8_t EEMEM
   contrast_addr,
   border_state_addr;
 
-enum direction { STAY, LEFT, RIGHT, UP, DOWN };
-direction dir;
+enum 
+{ 
+  STAY, 
+  LEFT, 
+  RIGHT, 
+  UP, 
+  DOWN 
+} dir;
+
 ST7558 lcd = ST7558(RST_PIN);
 
 void setup() 
 {
+#if(DEBUG == 1)
   Serial.begin(9600); // for debug
-  
+#endif
+
   randomSeed(analogRead(A7)); // rand init
 
   pinMode( SW, INPUT ); // for switch on a joystick
@@ -152,7 +163,7 @@ void draw_menu()
 {
   dir = STAY;
 
-  lcd.drawBitmap( random(14, 16), random(2, 4), logo_snake, snake_logo_w, snake_logo_h, BLACK );
+  lcd.drawBitmap( random(14, 16), random(2, 4), snake_logo, snake_logo_w, snake_logo_h, BLACK );
   lcd.drawRoundRect( (width/2) - 16, 35, 33, 11, 2, BLACK );
   lcd.setCursor( (width/2) - 14, 37 );
   lcd.print("start");
@@ -162,7 +173,6 @@ void draw_menu()
 
   uint8_t n_items = 2;
   main_menu_item = menu_switcher( main_menu_item, n_items );
-
   if (main_menu_item == 1)
   {
     if (flicker)
@@ -176,7 +186,6 @@ void draw_menu()
       flicker = !flicker;
     }
   }
-    
   else if (main_menu_item == 2) 
   {
     if (flicker) 
@@ -299,7 +308,7 @@ void draw_gameover_menu ()
 {
   dir = STAY;
 
-  lcd.drawBitmap( random(-1, 1), random(-1,1), logo_gameOver, gameover_logo_w, gameover_logo_h, BLACK );
+  lcd.drawBitmap( random(-1, 1), random(-1,1), gameover_logo, gameover_logo_w, gameover_logo_h, BLACK );
   lcd.drawRoundRect( (width/2) - 22, 35, 45, 11, 2, BLACK );
   lcd.setCursor( (width/2) - 20, 37 );
   lcd.print("restart");
@@ -350,28 +359,34 @@ void draw_gameover_menu ()
 
 uint8_t menu_switcher (uint8_t menu_item, uint8_t n_items)
 {
-  if (millis() - prev_millis >= 150)
+  get_dir();
+  uint8_t cur_item = menu_item;
+  if (millis() - prev_millis >= 250 && dir != 0)
   {
     prev_millis = millis();
-    get_dir();
+    switch (dir) 
+    {
+    case DOWN:
+      menu_item--;
+      if (menu_item <= 0)
+        menu_item = n_items;
+      break;
+    case UP:
+      menu_item++;
+      if (menu_item > n_items)
+        menu_item = 1;
+      break;
+    default:
+      break;
+    }
   }
-  switch (dir) 
+  if (cur_item != menu_item)
   {
-  case DOWN:
-    menu_item--;
-    if (menu_item <= 0)
-      menu_item = n_items;
-    break;
-  case UP:
-    menu_item++;
-    if (menu_item > n_items)
-      menu_item = 1;
-    break;
-  default:
-    break;
+    tone(SPK, 80); // 80 Hz tone frequency
+    spk_state = true;
   }
+  no_tone(100);
 
-  
   return menu_item;
 }
 
@@ -406,7 +421,6 @@ void get_dir()
     dir = UP;
   else if (stick_y < 100)
     dir = DOWN;
-    
 }
   
 void logic() 
@@ -504,8 +518,8 @@ void logic()
     food_x = random(0, 30) * 3 + 1;
     food_y = random(3, 17) * 3 + 1;
 
-    n_eat++; 
-    tone(SPK, 150);
+    n_eat++;
+    tone(SPK, 150); // 150 Hz tone frequency
     spk_state = true;
     prev_millis = millis();
   }
