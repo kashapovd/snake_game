@@ -52,7 +52,7 @@ void
   logic(),
   no_tone(uint8_t duration);
 uint8_t 
-  menu_switcher (uint8_t, uint8_t);
+  menu_switcher (uint8_t menu_item, uint8_t n_items);
 
 // vars
 int8_t 
@@ -75,6 +75,7 @@ bool
   menu_state,
   borders,
   flicker,
+  invert,
   spk_state;
 
 // arrays for snake's tail
@@ -83,9 +84,10 @@ int8_t
   tailY[50];
 
 // automatic eeprom address distributor
-uint8_t EEMEM 
+uint8_t EEMEM
   contrast_addr,
-  border_state_addr;
+  border_state_addr,
+  invert_addr;
 
 enum 
 { 
@@ -113,10 +115,13 @@ void setup()
   lcd.init();
   lcd.setRotation(0);
   lcd.setContrast( eeprom_read_byte( &contrast_addr ) );
+  lcd.setContrast(65);
+  lcd.clearDisplay();
 
   // game init
   default_set();
   borders = eeprom_read_byte( &border_state_addr );
+  invert = eeprom_read_byte( &invert_addr );
   menu_state = true;
   prev_millis = 0;
   flicker = true,
@@ -126,6 +131,8 @@ void setup()
 // main loop
 void loop() 
 {
+  lcd.invertDisplay(invert);
+  
   if (menu_state) 
     draw_menu();
   else if (options_state)
@@ -137,7 +144,7 @@ void loop()
     else
       draw_gameover_menu();
   }
-  
+
   lcd.display();
   lcd.clearDisplay();
 }
@@ -166,10 +173,10 @@ void draw_menu()
   lcd.drawBitmap( random(14, 16), random(2, 4), snake_logo, snake_logo_w, snake_logo_h, BLACK );
   lcd.drawRoundRect( (width/2) - 16, 35, 33, 11, 2, BLACK );
   lcd.setCursor( (width/2) - 14, 37 );
-  lcd.print("start");
+  lcd.print(F("start"));
   lcd.drawRoundRect( (width/2) - 22, 49, 45, 12, 2, BLACK );
   lcd.setCursor( (width/2) - 20, 51 );
-  lcd.print("options");
+  lcd.print(F("options"));
 
   uint8_t n_items = 2;
   main_menu_item = menu_switcher( main_menu_item, n_items );
@@ -210,12 +217,13 @@ void draw_menu()
     }
     else 
     {
-      on_click();
       menu_state = false;
       options_state = true;
       options_menu_item = 1;
       contrast = eeprom_read_byte( &contrast_addr );
       borders = eeprom_read_byte( &border_state_addr );
+      invert = eeprom_read_byte( &invert_addr );
+      on_click();
     }
   }
 }
@@ -224,24 +232,25 @@ void draw_options()
 {
   dir = STAY;
 
-  lcd.setCursor(8, 0);
-  lcd.print("contrast:");
+  lcd.setCursor(8, 1);
+  lcd.print(F("contrast:"));
   lcd.print(contrast);
-  lcd.setCursor(8, 8);
-  lcd.print("borders:");
-  if (borders)
-    lcd.print("true");
-  else 
-    lcd.print("false");
-  lcd.setCursor(8, 15);
-  lcd.print("exit");
+  lcd.setCursor(8, 9);
+  lcd.print(F("borders:"));
+  (borders) ? lcd.print(F("true")) : lcd.print(F("false"));
+  lcd.setCursor(8, 17);
+  lcd.print(F("theme:"));
+  (invert) ? lcd.print(F("dark")) : lcd.print(F("ligth"));
+  lcd.setCursor(8, 25);
+  lcd.print(F("exit"));
+
     
-  int n_items = 3;
+  int n_items = 4;
     options_menu_item = menu_switcher(options_menu_item, n_items);
   
   if (options_menu_item == 1) 
   {
-    lcd.setCursor(0,0);
+    lcd.setCursor(0,1);
     lcd.print('>');
 
     get_dir();
@@ -261,8 +270,8 @@ void draw_options()
   }
   else if (options_menu_item == 2) 
   {
-    lcd.setCursor(0, 8);
-    lcd.print('>');
+    lcd.setCursor(0, 9);
+    lcd.print(F(">"));
 
     if (!digitalRead(SW)) 
     {
@@ -270,27 +279,39 @@ void draw_options()
       borders = !borders;
     }
   }
+  else if (options_menu_item == 3) 
+  {
+    lcd.setCursor(0, 17);
+    lcd.print(F(">"));
+    
+    if (!digitalRead(SW)) 
+    {
+      on_click();
+      invert = !invert;
+    }
+  }
   else 
   {
-    lcd.setCursor(0, 15);
-    lcd.print('>');
+    lcd.setCursor(0, 25);
+    lcd.print(F(">"));
 
     if (!digitalRead(SW)) 
     {
-      eeprom_update_byte( &contrast_addr, contrast );
-      eeprom_update_byte( &border_state_addr, borders );
-      on_click();
       menu_state = true;
       options_state = false;
+      eeprom_write_byte( &contrast_addr, contrast );
+      eeprom_write_byte( &border_state_addr, borders );
+      eeprom_write_byte( &invert_addr, invert );
+      on_click();
     }
   }
 }
 
 void draw_game() 
 {
-  lcd.drawRect( 0, 9, field_x, field_y, BLACK );
+  (invert) ? lcd.drawLine(0, 9, 95, 9, BLACK) : lcd.drawRect( 0, 9, field_x, field_y, BLACK );
   lcd.setCursor( 1, 1 );
-  lcd.print("Score:");
+  lcd.print(F("Score:"));
   lcd.print(n_eat);
 
   logic();
@@ -311,11 +332,11 @@ void draw_gameover_menu ()
   lcd.drawBitmap( random(-1, 1), random(-1,1), gameover_logo, gameover_logo_w, gameover_logo_h, BLACK );
   lcd.drawRoundRect( (width/2) - 22, 35, 45, 11, 2, BLACK );
   lcd.setCursor( (width/2) - 20, 37 );
-  lcd.print("restart");
+  lcd.print(F("restart"));
 
   lcd.drawRoundRect( (width/2) - 13, 49, 27, 12, 2, BLACK );
   lcd.setCursor( (width/2) - 11, 51 );
-  lcd.print("menu");
+  lcd.print(F("menu"));
 
   uint8_t n_items = 2;
   gameover_menu_item = menu_switcher(gameover_menu_item, n_items);
