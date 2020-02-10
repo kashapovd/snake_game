@@ -6,8 +6,8 @@
 #include <SPI.h>
 #include <logo.h>
 
-#define DEBUG 0
-#define ENABLE_FPS 0
+#define DEBUG 0             // 1 - enable, 0 - disable
+#define ENABLE_FPS 1
 
 /* set pins
 
@@ -54,9 +54,9 @@ void
   on_click(),
   get_dir(),
   logic(),
-  no_tone(uint8_t duration);
+  no_tone(uint8_t);
 uint8_t 
-  menu_switcher (uint8_t menu_item, uint8_t n_items);
+  menu_switcher (uint8_t, uint8_t);
 
 // vars
 int8_t 
@@ -104,7 +104,7 @@ enum
   LEFT, 
   RIGHT, 
   UP, 
-  DOWN 
+  DOWN
 } dir;
 
 ST7558 lcd = ST7558(RST_PIN);
@@ -152,6 +152,10 @@ void loop()
     else
       draw_gameover_menu();
   }
+  
+#if(DEBUG)
+  Serial.println("Snake: [" + String(sn_x) + ',' + String(sn_y) + ']');
+#endif
 
   lcd.display();
   lcd.clearDisplay();
@@ -314,6 +318,9 @@ void draw_game()
   fps = 1000/(millis()-fps_millis);
   lcd.setCursor(72,1);
   lcd.setTextColor(BLACK);
+#if(DEBUG)
+  Serial.println(fps);
+#endif
   lcd.print(fps);
   lcd.print("fps");
   fps_millis = millis();
@@ -437,21 +444,13 @@ void get_dir()
   
 void logic() 
 {
-  int prevX = tailX[0];
-  int prevY = tailY[0];
-  int prev2X, prev2Y;
+  for (int i = n_eat; i > 0; i--)
+  {
+    tailX[i] = tailX[i-1];
+    tailY[i] = tailY[i-1];
+  }
   tailX[0] = sn_x;
   tailY[0] = sn_y;
-
-  for (int i = 1; i <= n_eat; i++)
-  {
-    prev2X = tailX[i];
-    prev2Y = tailY[i];
-    tailX[i] = prevX;
-    tailY[i] = prevY;
-    prevX = prev2X;
-    prevY = prev2Y;
-  }
 
   get_dir();
   switch (prev_dir)
