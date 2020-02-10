@@ -6,8 +6,8 @@
 #include <SPI.h>
 #include <logo.h>
 
-#define DEBUG 0
-#define ENABLE_FPS 0
+#define DEBUG 0             // 1 - enable, 0 - disable
+#define ENABLE_FPS 1
 
 /* set pins
 
@@ -95,16 +95,16 @@ int8_t
 
 // automatic eeprom address distributor
 uint8_t EEMEM
-contrast_addr,
-border_state_addr,
-invert_addr;
+        contrast_addr,
+        border_state_addr,
+        invert_addr;
 
-enum {
-    STAY,
-    LEFT,
-    RIGHT,
-    UP,
-    DOWN
+enum { 
+        STAY,
+        LEFT,
+        RIGHT,
+        UP,
+        DOWN
 } dir;
 
 ST7558 lcd = ST7558(RST_PIN);
@@ -145,7 +145,8 @@ void loop()
         draw_menu();
     else if (options_state)
         draw_options();
-    else {
+    else 
+    {
         if (!game_over)
             draw_game();
         else
@@ -192,20 +193,17 @@ void draw_menu()
     const static uint8_t n_items = 2;
     main_menu_item = menu_switcher(main_menu_item, n_items);
     if (main_menu_item == 1)
-    {
         lcd.drawRoundRect((width / 2) - 17, 34, 35, 13, 2, flicker ? BLACK : WHITE);
-    } else if (main_menu_item == 2)
-    {
+    else if (main_menu_item == 2)
         lcd.drawRoundRect((width / 2) - 23, 48, 47, 14, 2, flicker ? BLACK : WHITE);
-    }
     flicker = !flicker;
 
     if (!digitalRead(SW))
     {
         if (main_menu_item == 1)
+            default_set(); 
+        else 
         {
-            default_set();
-        } else {
             options_state = true;
             options_menu_item = 1;
             contrast = eeprom_read_byte(&contrast_addr);
@@ -256,7 +254,8 @@ void draw_options()
                 break;
         }
         lcd.setContrast(contrast);
-    } else if (options_menu_item == 2)
+    } 
+    else if (options_menu_item == 2)
     {
         lcd.setCursor(0, 9);
         lcd.print(F(">"));
@@ -266,7 +265,8 @@ void draw_options()
             borders = !borders;
             on_click();
         }
-    } else if (options_menu_item == 3)
+    } 
+    else if (options_menu_item == 3)
     {
         lcd.setCursor(0, 17);
         lcd.print(F(">"));
@@ -276,7 +276,9 @@ void draw_options()
             invert = !invert;
             on_click();
         }
-    } else {
+    } 
+    else 
+    {
         lcd.setCursor(0, 25);
         lcd.print(F(">"));
 
@@ -340,12 +342,9 @@ void draw_gameover_menu()
     gameover_menu_item = menu_switcher(gameover_menu_item, n_items);
 
     if (gameover_menu_item == 1)
-    {
-        lcd.drawRoundRect((width / 2) - 23, 34, 47, 13, 2, flicker ? BLACK : WHITE)
-    } else if (gameover_menu_item == 2)
-    {
+        lcd.drawRoundRect((width / 2) - 23, 34, 47, 13, 2, flicker ? BLACK : WHITE); 
+    else if (gameover_menu_item == 2)
         lcd.drawRoundRect((width / 2) - 14, 48, 29, 14, 2, flicker ? BLACK : WHITE);
-    }
     flicker = !flicker;
 
     if (!digitalRead(SW))
@@ -497,10 +496,11 @@ void logic()
                 sn_x = 1;
                 break;
         }
-    } else
+    } 
+    else
         // if u bump into borders
-    if (sn_y == 7 || sn_y == 64 || sn_x == -2 || sn_x == 94)
-        game_over = true;
+        if (sn_y == 7 || sn_y == 64 || sn_x == -2 || sn_x == 94)
+            game_over = true;
 
     if (sn_x == food_x && sn_y == food_y)
     {
