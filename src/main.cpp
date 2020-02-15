@@ -11,23 +11,23 @@
 
 /* set pins
 
-  Display connections:
-    VCC -> +3.3v arduino pin
-    GND -> +0v arduino pin 
-    SCL -> A5 arduino pin
-    SDA -> A4 arduino pin
-    RST -> A3 arduino pin
+    Display connections:
+        VCC -> +3.3v arduino pin
+        GND -> +0v arduino pin 
+        SCL -> A5 arduino pin
+        SDA -> A4 arduino pin
+        RST -> A3 arduino pin
 
-  Joystick connections:
-    VCC -> +5v arduino pin
-    GND -> +0v arduino pin
-    URX -> A2 arduino pin
-    URY -> A1 arduino pin
-    SW -> A0 arduino pin via 10k pullup resistor
+    Joystick connections:
+        VCC -> +5v arduino pin
+        GND -> +0v arduino pin
+        URX -> A2 arduino pin
+        URY -> A1 arduino pin
+        SW -> A0 arduino pin via 10k pullup resistor
 
     speaker -> 4 arduino pin
-
 */
+
 #define RST_PIN A3
 #define STICK_X A2
 #define STICK_Y A1
@@ -525,7 +525,7 @@ void logic()
       
   if ( sn_x == food_x && sn_y == food_y ) 
   {
-    // calculate food position 
+    // calculate food position
     food_x = random(0, 30) * 3 + 1;
     food_y = random(3, 17) * 3 + 1;
     n_eat++;
