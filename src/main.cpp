@@ -73,14 +73,18 @@ uint8_t
     contrast;                 // lcd contrast parameter
 
 uint32_t prev_millis;
-bool
-    game_over,
-    options_state,
-    menu_state,
-    borders,
-    flicker,
-    inverter,
-    spk_state;
+
+struct {
+    unsigned 
+        gameover : 1,
+        options : 1, 
+        menu : 1,
+        borders : 1,
+        flicker : 1,
+        inverter : 1,
+        spk : 1;
+} state;
+
 
 #if(ENABLE_FPS)
 uint32_t fps_millis;
@@ -95,7 +99,7 @@ int8_t
 // automatic eeprom address distributor
 uint8_t EEMEM
     contrast_addr,
-    border_state_addr,
+    borders_state_addr,
     inverter_addr;
 
 enum { 
@@ -127,26 +131,26 @@ void setup() {
 
     // game init
     default_set();
-    borders = eeprom_read_byte(&border_state_addr);
-    inverter = eeprom_read_byte(&inverter_addr);
-    menu_state = true;
+    state.borders = eeprom_read_byte(&borders_state_addr);
+    state.inverter = eeprom_read_byte(&inverter_addr);
+    state.menu = true;
     prev_millis = 0;
-    flicker = true;
-    spk_state = false;
+    state.flicker = true;
+    state.spk = false;
 }
 
 // main loop
 void loop() {
     
-    lcd.invertDisplay(inverter);
+    lcd.invertDisplay(state.inverter);
 
-    if (menu_state)
+    if (state.menu)
         draw_menu();
-    else if (options_state)
+    else if (state.options)
         draw_options();
     else {
 
-        if (!game_over)
+        if (!state.gameover)
             draw_game();
         else
             draw_gameover_menu();
@@ -163,7 +167,7 @@ void loop() {
 // set default game options
 void default_set() {
     
-    game_over = false;
+    state.gameover = false;
     // start point for snake
     sn_x = 46;
     sn_y = 34;
@@ -192,23 +196,23 @@ void draw_menu() {
     const static uint8_t n_items = 2;
     main_menu_item = menu_switcher(main_menu_item, n_items);
     if (main_menu_item == 1)
-        lcd.drawRoundRect((width / 2) - 17, 34, 35, 13, 2, flicker ? BLACK : WHITE);
+        lcd.drawRoundRect((width / 2) - 17, 34, 35, 13, 2, state.flicker ? BLACK : WHITE);
     else if (main_menu_item == 2)
-        lcd.drawRoundRect((width / 2) - 23, 48, 47, 14, 2, flicker ? BLACK : WHITE);
-    flicker = !flicker;
+        lcd.drawRoundRect((width / 2) - 23, 48, 47, 14, 2, state.flicker ? BLACK : WHITE);
+    state.flicker = !state.flicker;
 
     if (!digitalRead(SW)) {
         if (main_menu_item == 1)
             default_set(); 
         else {
 
-            options_state = true;
+            state.options = true;
             options_menu_item = 1;
             contrast = eeprom_read_byte(&contrast_addr);
-            borders = eeprom_read_byte(&border_state_addr);
-            inverter = eeprom_read_byte(&inverter_addr);
+            state.borders = eeprom_read_byte(&borders_state_addr);
+            state.inverter = eeprom_read_byte(&inverter_addr);
         }
-        menu_state = false;
+        state.menu = false;
         on_click();
     }
 }
@@ -221,11 +225,11 @@ void draw_options() {
     lcd.print(F("contrast:"));
     lcd.print(contrast);
     lcd.setCursor(8, 9);
-    lcd.print(F("borders:"));
-    lcd.print((borders ? F("true") : F("false")));
+    lcd.print(F("state.borders:"));
+    lcd.print((state.borders ? F("true") : F("false")));
     lcd.setCursor(8, 17);
     lcd.print(F("theme:"));
-    lcd.print((inverter ? F("dark") : F("light")));
+    lcd.print((state.inverter ? F("dark") : F("light")));
     lcd.setCursor(8, 25);
     lcd.print(F("exit"));
 
@@ -259,7 +263,7 @@ void draw_options() {
 
         if (!digitalRead(SW)) {
 
-            borders = !borders;
+            state.borders = !state.borders;
             on_click();
         }
     } else if (options_menu_item == 3) {
@@ -269,7 +273,7 @@ void draw_options() {
 
         if (!digitalRead(SW)) {
 
-            inverter = !inverter;
+            state.inverter = !state.inverter;
             on_click();
         }
     } else {
@@ -279,11 +283,11 @@ void draw_options() {
 
         if (!digitalRead(SW)) {
 
-            menu_state = true;
-            options_state = false;
+            state.menu = true;
+            state.options = false;
             eeprom_write_byte(&contrast_addr, contrast);
-            eeprom_write_byte(&border_state_addr, borders);
-            eeprom_write_byte(&inverter_addr, inverter);
+            eeprom_write_byte(&borders_state_addr, state.borders);
+            eeprom_write_byte(&inverter_addr, state.inverter);
             on_click();
         }
     }
@@ -291,7 +295,7 @@ void draw_options() {
 
 void draw_game() {
 
-    (inverter) ? lcd.drawLine(0, 9, 95, 9, BLACK) : lcd.drawRect(0, 9, field_x, field_y, BLACK);
+    (state.inverter) ? lcd.drawLine(0, 9, 95, 9, BLACK) : lcd.drawRect(0, 9, field_x, field_y, BLACK);
     lcd.setCursor(1, 1);
     lcd.print(F("Score:"));
     lcd.print(n_eat);
@@ -336,10 +340,10 @@ void draw_gameover_menu() {
     gameover_menu_item = menu_switcher(gameover_menu_item, n_items);
 
     if (gameover_menu_item == 1)
-        lcd.drawRoundRect((width / 2) - 23, 34, 47, 13, 2, flicker ? BLACK : WHITE); 
+        lcd.drawRoundRect((width / 2) - 23, 34, 47, 13, 2, state.flicker ? BLACK : WHITE); 
     else if (gameover_menu_item == 2)
-        lcd.drawRoundRect((width / 2) - 14, 48, 29, 14, 2, flicker ? BLACK : WHITE);
-    flicker = !flicker;
+        lcd.drawRoundRect((width / 2) - 14, 48, 29, 14, 2, state.flicker ? BLACK : WHITE);
+    state.flicker = !state.flicker;
 
     if (!digitalRead(SW)) {
 
@@ -347,7 +351,7 @@ void draw_gameover_menu() {
         if (gameover_menu_item == 1)
             default_set();
         else
-            menu_state = true;
+            state.menu = true;
     }
 }
 
@@ -377,7 +381,7 @@ uint8_t menu_switcher(uint8_t menu_item, uint8_t n_items)
     if (cur_item != menu_item) {
 
         tone(SPK, 80); // 80 Hz tone frequency
-        spk_state = true;
+        state.spk = true;
     }
     no_tone(100);
 
@@ -390,11 +394,11 @@ void on_click() {
 
 void no_tone(uint8_t duration) {
 
-    if (millis() - prev_millis >= duration && spk_state) {
+    if (millis() - prev_millis >= duration && state.spk) {
 
         prev_millis = 0;
         noTone(SPK);
-        spk_state = false;
+        state.spk = false;
     }
 }
 
@@ -468,7 +472,7 @@ void logic() {
     }
     prev_dir = dir;
 
-    if (!borders) {
+    if (!state.borders) {
 
         switch (sn_y) {
 
@@ -490,9 +494,9 @@ void logic() {
         }
     } 
     else
-        // if u bump into borders
+        // if u bump into state.borders
         if (sn_y == 7 || sn_y == 64 || sn_x == -2 || sn_x == 94)
-            game_over = true;
+            state.gameover = true;
 
     if (sn_x == food_x && sn_y == food_y) {
         
@@ -501,7 +505,7 @@ void logic() {
         food_y = random(3, 17) * 3 + 1;
         n_eat++;
         tone(SPK, 150); // 150 Hz tone frequency
-        spk_state = true;
+        state.spk = true;
         prev_millis = millis();
     }
     no_tone(100); // 100ms tone duration
@@ -509,5 +513,5 @@ void logic() {
     // check self-eating
     for (int k = 0; k < n_eat; k++)
         if (tailX[k] == sn_x && tailY[k] == sn_y)
-            game_over = true;
+            state.gameover = true;
 }
