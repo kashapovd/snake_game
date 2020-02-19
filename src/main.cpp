@@ -57,24 +57,48 @@ void
 
 uint8_t menu_switcher(uint8_t, uint8_t);
 
-// vars
-int8_t
-    sn_x,                     // snake horizontally position
-    sn_y,                     // snake vertical position
-    food_x,                   // food horizontally position
-    food_y;                   // food vertical position
+// main struct
+struct snake {
+    signed
+        x : 8,                  // snake horizontally position
+        y : 8,                  // snake vertical position
+        prev_dir : 4,           // previos direction of snake. need for correct game experience
+        n_eat : 6;              // the number of eaten food
 
-uint8_t
-    n_eat,                    // the number of eaten food
-    prev_dir,                 // previos direction of snake. need for correct game experience
-    main_menu_item,
-    gameover_menu_item,
-    options_menu_item,
-    contrast;                 // lcd contrast parameter
+    struct food {
+        unsigned
+            x : 7,              // food horizontally position
+            y : 6;              // food vertical position
+    } food;
+    
+    //directions
+    enum dir { 
+        STAY,
+        LEFT,
+        RIGHT,
+        UP,
+        DOWN
+    } dir : 4;
 
-uint32_t prev_millis;
+    // structs for snake's tail
+    struct tail {
+        signed 
+            x : 8,
+            y : 7;
+    } tail[50];
 
-struct {
+    
+} snake;
+
+struct item {
+    unsigned
+        main : 3,
+        gameover : 3,
+        options : 3;
+
+} menu_item;
+
+struct states {
     unsigned 
         gameover : 1,
         options : 1, 
@@ -85,30 +109,19 @@ struct {
         spk : 1;
 } state;
 
+uint8_t contrast;                 // lcd contrast parameter
+uint32_t prev_millis;
 
 #if(ENABLE_FPS)
 uint32_t fps_millis;
 uint8_t fps;
 #endif
 
-// arrays for snake's tail
-int8_t
-    tailX[50],
-    tailY[50];
-
 // automatic eeprom address distributor
 uint8_t EEMEM
     contrast_addr,
     borders_state_addr,
     inverter_addr;
-
-enum { 
-    STAY,
-    LEFT,
-    RIGHT,
-    UP,
-    DOWN
-} dir;
 
 ST7558 lcd = ST7558(RST_PIN);
 
@@ -157,7 +170,7 @@ void loop() {
     }
 
 #if(DEBUG)
-    Serial.println("Snake: [" + String(sn_x) + ',' + String(sn_y) + ']');
+    Serial.println("Snake: [" + String(snake.x) + ',' + String(snake.y) + ']');
 #endif
 
     lcd.display();
@@ -169,21 +182,21 @@ void default_set() {
     
     state.gameover = false;
     // start point for snake
-    sn_x = 46;
-    sn_y = 34;
+    snake.x = 46;
+    snake.y = 34;
     // start point for food
-    food_x = random(0, 30) * 3 + 1;
-    food_y = random(3, 17) * 3 + 1;
+    snake.food.x = random(0, 30) * 3 + 1;
+    snake.food.y = random(3, 17) * 3 + 1;
 
-    n_eat = 0;
-    dir = STAY;
-    main_menu_item = 1;
-    gameover_menu_item = 1;
+    snake.n_eat = 0;
+    snake.dir = snake::STAY;
+    menu_item.main = 1;
+    menu_item.gameover = 1;
 }
 
 void draw_menu() {
 
-    dir = STAY;
+    snake.dir = snake::STAY;
 
     lcd.drawBitmap(random(14, 16), random(2, 4), snake_logo, snake_logo_w, snake_logo_h, BLACK);
     lcd.drawRoundRect((width / 2) - 16, 35, 33, 11, 2, BLACK);
@@ -194,20 +207,20 @@ void draw_menu() {
     lcd.print(F("options"));
 
     const static uint8_t n_items = 2;
-    main_menu_item = menu_switcher(main_menu_item, n_items);
-    if (main_menu_item == 1)
+    menu_item.main = menu_switcher(menu_item.main, n_items);
+    if (menu_item.main == 1)
         lcd.drawRoundRect((width / 2) - 17, 34, 35, 13, 2, state.flicker ? BLACK : WHITE);
-    else if (main_menu_item == 2)
+    else if (menu_item.main == 2)
         lcd.drawRoundRect((width / 2) - 23, 48, 47, 14, 2, state.flicker ? BLACK : WHITE);
     state.flicker = !state.flicker;
 
     if (!digitalRead(SW)) {
-        if (main_menu_item == 1)
+        if (menu_item.main == 1)
             default_set(); 
         else {
 
             state.options = true;
-            options_menu_item = 1;
+            menu_item.options = 1;
             contrast = eeprom_read_byte(&contrast_addr);
             state.borders = eeprom_read_byte(&borders_state_addr);
             state.inverter = eeprom_read_byte(&inverter_addr);
@@ -219,7 +232,7 @@ void draw_menu() {
 
 void draw_options() {
     
-    dir = STAY;
+    snake.dir = snake::STAY;
 
     lcd.setCursor(8, 1);
     lcd.print(F("contrast:"));
@@ -235,28 +248,28 @@ void draw_options() {
 
 
     const static uint8_t n_items = 4;
-    options_menu_item = menu_switcher(options_menu_item, n_items);
+    menu_item.options = menu_switcher(menu_item.options, n_items);
 
-    if (options_menu_item == 1) {
+    if (menu_item.options == 1) {
 
         lcd.setCursor(0, 1);
         lcd.print(F(">"));
 
         get_dir();
-        switch (dir) {
+        switch (snake.dir) {
 
-            case LEFT:
+            case snake::LEFT:
                 contrast += 5;
-                dir = STAY;
+                snake.dir = snake::STAY;
                 break;
-            case RIGHT:
+            case snake::RIGHT:
                 contrast -= 5;
-                dir = STAY;
+                snake.dir = snake::STAY;
             default:
                 break;
         }
         lcd.setContrast(contrast);
-    } else if (options_menu_item == 2) {
+    } else if (menu_item.options == 2) {
 
         lcd.setCursor(0, 9);
         lcd.print(F(">"));
@@ -266,7 +279,7 @@ void draw_options() {
             state.borders = !state.borders;
             on_click();
         }
-    } else if (options_menu_item == 3) {
+    } else if (menu_item.options == 3) {
 
         lcd.setCursor(0, 17);
         lcd.print(F(">"));
@@ -298,7 +311,7 @@ void draw_game() {
     (state.inverter) ? lcd.drawLine(0, 9, 95, 9, BLACK) : lcd.drawRect(0, 9, field_x, field_y, BLACK);
     lcd.setCursor(1, 1);
     lcd.print(F("Score:"));
-    lcd.print(n_eat);
+    lcd.print(snake.n_eat);
 
 #if(ENABLE_FPS)
     fps = 1000/(millis()-fps_millis);
@@ -315,17 +328,17 @@ void draw_game() {
     logic();
 
     // draw snake's head
-    lcd.fillRect(sn_x, sn_y, a, a, BLACK);
+    lcd.fillRect(snake.x, snake.y, a, a, BLACK);
     // draw snake's tail
-    for (uint8_t i = 0; i < n_eat; i++)
-        lcd.drawRect(tailX[i], tailY[i], a, a, BLACK);
+    for (uint8_t i = 0; i < snake.n_eat; i++)
+        lcd.drawRect(snake.tail[i].x, snake.tail[i].y, a, a, BLACK);
     // draw food
-    lcd.drawRect(food_x, food_y, a, a, BLACK);
+    lcd.drawRect(snake.food.x, snake.food.y, a, a, BLACK);
 }
 
 void draw_gameover_menu() {
     
-    dir = STAY;
+    snake.dir = snake::STAY;
 
     lcd.drawBitmap(random(-1, 1), random(-1, 1), gameover_logo, gameover_logo_w, gameover_logo_h, BLACK);
     lcd.drawRoundRect((width / 2) - 22, 35, 45, 11, 2, BLACK);
@@ -337,18 +350,18 @@ void draw_gameover_menu() {
     lcd.print(F("menu"));
 
     const static uint8_t n_items = 2;
-    gameover_menu_item = menu_switcher(gameover_menu_item, n_items);
+    menu_item.gameover = menu_switcher(menu_item.gameover, n_items);
 
-    if (gameover_menu_item == 1)
+    if (menu_item.gameover == 1)
         lcd.drawRoundRect((width / 2) - 23, 34, 47, 13, 2, state.flicker ? BLACK : WHITE); 
-    else if (gameover_menu_item == 2)
+    else if (menu_item.gameover == 2)
         lcd.drawRoundRect((width / 2) - 14, 48, 29, 14, 2, state.flicker ? BLACK : WHITE);
     state.flicker = !state.flicker;
 
     if (!digitalRead(SW)) {
 
         on_click();
-        if (gameover_menu_item == 1)
+        if (menu_item.gameover == 1)
             default_set();
         else
             state.menu = true;
@@ -359,17 +372,17 @@ uint8_t menu_switcher(uint8_t menu_item, uint8_t n_items)
 {
     get_dir();
     uint8_t cur_item = menu_item;
-    if (millis() - prev_millis >= 250 && dir != 0) {
+    if (millis() - prev_millis >= 250 && snake.dir != 0) {
 
         prev_millis = millis();
-        switch (dir) {
+        switch (snake.dir) {
 
-            case DOWN:
+            case snake::DOWN:
                 menu_item--;
                 if (menu_item <= 0)
                     menu_item = n_items;
                 break;
-            case UP:
+            case snake::UP:
                 menu_item++;
                 if (menu_item > n_items)
                     menu_item = 1;
@@ -408,102 +421,102 @@ void get_dir() {
     int stick_y = analogRead(STICK_Y);
 
     if (stick_x > 700)
-        dir = RIGHT;
+        snake.dir = snake::RIGHT;
     else if (stick_x < 100)
-        dir = LEFT;
+        snake.dir = snake::LEFT;
     if (stick_y > 700)
-        dir = UP;
+        snake.dir = snake::UP;
     else if (stick_y < 100)
-        dir = DOWN;
+        snake.dir = snake::DOWN;
 }
 
 void logic() {
 
-    for (int i = n_eat; i > 0; i--) {
+    for (int i = snake.n_eat; i > 0; i--) {
 
-        tailX[i] = tailX[i - 1];
-        tailY[i] = tailY[i - 1];
+        snake.tail[i].x = snake.tail[i - 1].x;
+        snake.tail[i].y = snake.tail[i - 1].y;
     }
-    tailX[0] = sn_x;
-    tailY[0] = sn_y;
+    snake.tail[0].x = snake.x;
+    snake.tail[0].y = snake.y;
 
     get_dir();
-    switch (prev_dir) {
+    switch (snake.prev_dir) {
 
-        case UP:
-            if (dir == DOWN)
-                dir = UP;
+        case (snake::UP):
+            if (snake.dir == snake::DOWN)
+                snake.dir = snake::UP;
             break;
-        case DOWN:
-            if (dir == UP)
-                dir = DOWN;
+        case snake::DOWN:
+            if (snake.dir == snake::UP)
+                snake.dir = snake::DOWN;
             break;
-        case LEFT:
-            if (dir == RIGHT)
-                dir = LEFT;
+        case snake::LEFT:
+            if (snake.dir == snake::RIGHT)
+                snake.dir = snake::LEFT;
             break;
-        case RIGHT:
-            if (dir == LEFT)
-                dir = RIGHT;
+        case snake::RIGHT:
+            if (snake.dir == snake::LEFT)
+                snake.dir = snake::RIGHT;
             break;
         default:
             break;
     }
-    switch (dir) {
+    switch (snake.dir) {
         
-        case UP:
-            if (sn_x != -2)
-                sn_y += a;
+        case snake::UP:
+            if (snake.x != -2)
+                snake.y += a;
             break;
-        case DOWN:
-            if (sn_x != 94)
-                sn_y -= a;
+        case snake::DOWN:
+            if (snake.x != 94)
+                snake.y -= a;
             break;
-        case LEFT:
-            if (sn_y != 7)
-                sn_x -= a;
+        case snake::LEFT:
+            if (snake.y != 7)
+                snake.x -= a;
             break;
-        case RIGHT:
-            if (sn_y != 64)
-                sn_x += a;
+        case snake::RIGHT:
+            if (snake.y != 64)
+                snake.x += a;
             break;
-        case STAY:
+        case snake::STAY:
             break;
     }
-    prev_dir = dir;
+    snake.prev_dir = snake.dir;
 
     if (!state.borders) {
 
-        switch (sn_y) {
+        switch (snake.y) {
 
             case 64:
-                sn_y = 10;
+                snake.y = 10;
                 break;
             case 7:
-                sn_y = 64;
+                snake.y = 64;
                 break;
         }
-        switch (sn_x) {
+        switch (snake.x) {
 
             case -2:
-                sn_x = 91;
+                snake.x = 91;
                 break;
             case 94:
-                sn_x = 1;
+                snake.x = 1;
                 break;
         }
     } 
     else
         // if u bump into state.borders
-        if (sn_y == 7 || sn_y == 64 || sn_x == -2 || sn_x == 94)
+        if (snake.y == 7 || snake.y == 64 || snake.x == -2 || snake.x == 94)
             state.gameover = true;
 
-    if (sn_x == food_x && sn_y == food_y) {
+    if (snake.x == snake.food.x && snake.y == snake.food.y) {
         
         // calculate food position 
-        food_x = random(0, 30) * 3 + 1;
-        food_y = random(3, 17) * 3 + 1;
-        n_eat++;
+        snake.food.x = random(0, 30) * 3 + 1;
+        snake.food.y = random(3, 17) * 3 + 1;
+        snake.n_eat++;
         tone(SPK, 150); // 150 Hz tone frequency
         state.spk = true;
         prev_millis = millis();
@@ -511,7 +524,7 @@ void logic() {
     no_tone(100); // 100ms tone duration
 
     // check self-eating
-    for (int k = 0; k < n_eat; k++)
-        if (tailX[k] == sn_x && tailY[k] == sn_y)
+    for (int k = 0; k < snake.n_eat; k++)
+        if (snake.tail[k].x == snake.x && snake.tail[k].y == snake.y)
             state.gameover = true;
 }
