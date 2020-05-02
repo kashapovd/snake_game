@@ -2,8 +2,6 @@
 #include <avr/eeprom.h>
 #include <Adafruit_GFX.h>
 #include <ST7558.h>
-#include <Wire.h>
-#include <SPI.h>
 #include <logo.h>
 
 #define DEBUG 0             // 1 - enable, 0 - disable
@@ -23,7 +21,7 @@
         GND -> +0v arduino pin
         URX -> A2 arduino pin
         URY -> A1 arduino pin
-        SW -> A0 arduino pin via 10k pullup resistor
+        SW -> 3 arduino pin via 10k pullup resistor
 
     speaker -> 4 arduino pin
 */
@@ -31,7 +29,7 @@
 #define RST_PIN A3
 #define STICK_X A2
 #define STICK_Y A1
-#define SW A0
+#define SW 3
 #define SPK 4
 
 // lcd resolution
@@ -60,15 +58,15 @@ uint8_t menu_switcher(uint8_t, uint8_t);
 // main struct
 struct snake {
     signed
-        x : 8,                  // snake horizontally position
-        y : 8,                  // snake vertical position
-        prev_dir : 4,           // previos direction of snake. need for correct game experience
-        n_eat : 6;              // the number of eaten food
+        x ,                  // snake horizontally position
+        y,                  // snake vertical position
+        prev_dir,           // previos direction of snake. need for correct game experience
+        n_eat;              // the number of eaten food
 
     struct food {
         unsigned
-            x : 7,              // food horizontally position
-            y : 6;              // food vertical position
+            x,              // food horizontally position
+            y;              // food vertical position
     } food;
     
     //directions
@@ -78,13 +76,13 @@ struct snake {
         RIGHT,
         UP,
         DOWN
-    } dir : 4;
+    } dir;
 
     // structs for snake's tail
     struct tail {
         signed 
-            x : 8,
-            y : 7;
+            x,
+            y;
     } tail[50];
 
     
@@ -92,9 +90,9 @@ struct snake {
 
 struct item {
     unsigned
-        main : 3,
-        gameover : 3,
-        options : 3;
+        main,
+        gameover,
+        options;
 
 } menu_item;
 
@@ -136,9 +134,7 @@ void setup() {
     pinMode(SW, INPUT); // for switch on a joystick
 
     // lcd init
-    Wire.begin();
-    lcd.init();
-    lcd.setRotation(0);
+    lcd.begin();
     lcd.setContrast(eeprom_read_byte(&contrast_addr));
     lcd.clearDisplay();
 
@@ -238,7 +234,7 @@ void draw_options() {
     lcd.print(F("contrast:"));
     lcd.print(contrast);
     lcd.setCursor(8, 9);
-    lcd.print(F("state.borders:"));
+    lcd.print(F("borders:"));
     lcd.print((state.borders ? F("true") : F("false")));
     lcd.setCursor(8, 17);
     lcd.print(F("theme:"));
@@ -331,7 +327,7 @@ void draw_game() {
     lcd.fillRect(snake.x, snake.y, a, a, BLACK);
     // draw snake's tail
     for (uint8_t i = 0; i < snake.n_eat; i++)
-        lcd.drawRect(snake.tail[i].x, snake.tail[i].y, a, a, BLACK);
+        lcd.fillRect(snake.tail[i].x, snake.tail[i].y, a, a, BLACK);
     // draw food
     lcd.drawRect(snake.food.x, snake.food.y, a, a, BLACK);
 }
