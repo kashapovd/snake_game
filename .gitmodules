@@ -1,6 +1,0 @@
-[submodule "lib/ST7558-Motorola-C115-LCD-Library"]
-	path = lib/ST7558-Motorola-C115-LCD-Library
-	url = http://github.com/kashapovd/ST7558-Motorola-C115-LCD-Library
-[submodule "lib/Adafruit-GFX-Library"]
-	path = lib/Adafruit-GFX-Library
-	url = https://github.com/adafruit/Adafruit-GFX-Library
